@@ -8,21 +8,32 @@
                 <h4 class="card-title">{{todo.title}}</h4>
                 <p class="card-text">{{todo.body}}</p>
                 <p class="card-text">{{todo.complete}}</p>
-                <p class="card-text">{{todo.body}}</p>
                 <div class="btn-group" role="group" aria-label="">
                     <button type="button" class="btn btn-warning" @click="editTodo(todo.id)">수정</button>
-                    <button type="button" class="btn btn-danger" @click="deleteTodo(todo.id)">삭제</button>
-                    <button type="button" class="btn btn-primary">이전</button>
+                    <button type="button" class="btn btn-danger" @click="openModal(todo.id)">삭제</button>
+                    <button type="button" class="btn btn-primary" @click="moveList">목록보기</button>
                 </div>
             </div>
         </div>
     </div>
+    <!-- 경고창 -->
+    <ModalWin 
+        v-if="showModal"
+        @close="closeModal"
+        @delete="deleteTodo"
+    />
+
 </template>
 
 <script>
-    import { reactive } from 'vue';
-    import { useRoute, useRouter } from 'vue-router'
-    export default {
+   import { reactive, ref } from 'vue';
+   import { useRoute, useRouter } from 'vue-router'
+   import ModalWin from '@/components/ModalWin.vue';
+
+   export default {
+        components : {
+            ModalWin
+        },
         setup() {
             const route = useRoute();  
             // 타이틀
@@ -51,13 +62,15 @@
 
             // 할일 삭제 
             const router = useRouter();
-            const deleteTodo = (_id) => {
+            const deleteTodo = () => {
                 // console.log(_id);
-                fetch(`http://rightn.dothome.co.kr/data_delete.php?id=${_id}`)
+                fetch(`http://rightn.dothome.co.kr/data_delete.php?id=${deleteId.value}`)
                 .then(res => res.json())
                 .then(data => {
                     if(data.result == 1) {
-                        router.push('/list')
+                            router.push({
+                            name: "List"
+                        });
                     }else{
                         console.log('삭제에 실패했습니다');
                     }        
@@ -73,10 +86,39 @@
                 });
             }
 
+            // 목록으로 이동
+            const moveList = () => {
+                    router.push({
+                    name: "List"
+                });
+            }
+            // 모달창 닫기
+            // 모달이 보여지는 상태를 저장한다.
+            const showModal = ref(false);
+            // 선택된 id 를 저장한다.
+            const deleteId = ref(null); 
+
+            const closeModal = () => {
+                // 모달창 안보이게 처리
+                showModal.value = false;
+                deleteId.value = null;
+            }
+            // 모달창 보여주기
+            const openModal = (_id) => {
+                // 삭제해야 하는 아이디 저장
+                deleteId.value = _id;
+                // 모달을 보여주고
+                showModal.value = true;
+            }
+
             return {
                 todo,
                 deleteTodo,
-                editTodo
+                editTodo,
+                moveList,
+                closeModal,
+                openModal,
+                showModal
             }
         }
     }

@@ -15,59 +15,158 @@
 
             <div class="form-group">
               <label for="body">내용</label>
-              <textarea class="form-control" name="body" id="body" rows="3" v-model="todo.body"></textarea>
+              <textarea class="form-control" name="body" id="body" rows="3" 
+              v-model="todo.body"></textarea>
               <small id="helpId" class="form-text text-muted">내용을 입력하세요.</small>
             </div>
 
-            <div class="form-check">
-              <label class="form-check-label">
-                <input type="checkbox" class="form-check-input" name="" id="" value="checkedValue" checked>
-                완료여부
-              </label>
+            <div class="form-group">
+              <label>완료여부</label>
+              <input 
+              type="checkbox" 
+              class="ml-2 mr-2" 
+              :id="todo.id"
+              v-model="todo.active"
+              @change="toggleTodo()"
+              >
+
+              <span 
+                class="form-check-label" 
+                :class="todo.active == false ? 'active' : '' ">
+                {{ todo.active ? "완료" : "진행중" }}
+              </span>
             </div>
 
             <div class="btn-group" role="group" aria-label="">
-              <button type="submit" class="btn btn-danger">확인</button>
-              <button type="button" class="btn btn-primary">취소</button>
+              <button type="submit" class="btn btn-danger" :disabled="todoUpdate">확인</button>
+              <button type="button" class="btn btn-primary" @click="moveList">취소</button>
             </div>
 
         </form>
       </div>
       
     </div>
+    <!-- 안내창 -->
+    <ToastBox 
+    :message="toastMessage" 
+    v-if="toastShow" />
+
+
   </div>
 </template>
 
 <script>
-import { reactive } from 'vue'
+import { reactive, ref, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ToastBox from '@/components/ToastBox.vue'
+import _ from 'lodash'
+
 export default {
+  components: {
+      ToastBox
+  },
   setup(){
     // 자료가져오기(data_read_id.php 실행)
+
+    // 현재의 화면에 보여지는 자료
     const todo = reactive({
       title: '',
       complete: false,
       body: '',
-      id: 0
+      id: 0,
+      active: false
     });
+    // 원본값
+    const originalTodo = reactive({
+      title: '',
+      complete: false,
+      body: '',
+      id: 0,
+      active: false
+    });
+
+    // todo 와 originalTodo 를 비교한다. 
+    // 그 결과가 true 인지 false 인지 비교한다.
+    const todoUpdate = computed( () => {
+      return _.isEqual(todo, originalTodo);
+    });
+
+
+
     const route = useRoute();
     const getInfo = () => {
       fetch(`http://rightn.dothome.co.kr/data_read_id.php?id=${route.params.id}`)
         .then(res => res.json())
         .then(data => {
-            // console.log(data);
+            // 현재 화면에 보일값 갱신되는 값 보관용 
             todo.title = data.result[0].title;
             todo.body = data.result[0].body;
             todo.complete = data.result[0].complete;
             todo.id = data.result[0].id;
+            if(todo.complete === '0' ) {
+              todo.active = false;
+            }else{
+              todo.active = true;
+            }
+
+            // 원본 보관
+            originalTodo.title = data.result[0].title;
+            originalTodo.body = data.result[0].body;
+            originalTodo.complete = data.result[0].complete;
+            originalTodo.id = data.result[0].id;
+            if(originalTodo.complete === '0' ) {
+              originalTodo.active = false;
+            }else{
+              originalTodo.active = true;
+            }
         })
         .catch()
     }
     getInfo();
- // 업데이트
+
+    // 업데이트
     const router = useRouter();
-    
+
+    // 안내창
+    const toastMessage = ref('');
+    const toastShow = ref(false);
+    // 타이머로 제어하기 위한 것
+    const toastId = ref(null);
+    const triggerToast = (_m) => {
+        toastMessage.value = _m;
+        toastShow.value = true;
+        toastId.value = setTimeout( () => {                    
+            toastShow.value = false;
+            toastMessage.value = '';
+            clearTimeout(toastId.value);
+        }, 2000);
+    }
+
+    onUnmounted( () => {
+          clearTimeout(toastId.value);
+    });
+
+    const toggleTodo = () => {
+        if(todo.active == true) {
+          todo.complete = '1';
+        }else{
+          todo.complete = '0';
+        }
+    }
+
+
     const onSubmit = ()=> {
+      // 제목 없으면 업데이트금지
+      if (!todo.title) {
+          triggerToast('제목을 입력하세요.');
+          return;
+      }
+      // 내용이 없으면 업데이트금지
+      if (!todo.body) {
+          triggerToast('내용을 입력하세요.');
+          return;
+      }
+
       fetch(`http://rightn.dothome.co.kr/data_update.php?id=${todo.id}&title=${todo.title}&body=${todo.body}&complete=${todo.complete}`)
       .then(res => res.json())
       .then(data => {
@@ -76,7 +175,7 @@ export default {
           router.push({
             name:'Detail',
             params: {
-              id : todo.id
+              id:todo.id
             }
           })
         }
@@ -84,9 +183,22 @@ export default {
       .catch()
     }
 
+    // 목록으로 이동하기
+    const moveList = () => {
+      router.push({
+        name: "List"
+      });
+    }
+
     return {
-      todo
-      ,onSubmit
+      todo,
+      onSubmit,
+      moveList,
+      toastMessage,
+      toastShow,
+
+      todoUpdate,
+      toggleTodo
     }
 
   }
